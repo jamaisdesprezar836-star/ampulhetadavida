@@ -444,12 +444,12 @@ function compute(inp) {
       correct: true, disc: 0, pop: DEFAULT_POP
     };
   }
-  // Devolve o erro (com o que enviar ao GA4) ou null. O erro da idade em que parou
+  // Devolve o erro (o tipo vai ao GA4, sem nome de campo) ou null. O erro da idade em que parou
   // não é medido: o campo só existe para ex-fumantes.
   function validate(inp) {
-    if (!(inp.h >= 120 && inp.h <= 230)) return { msg: 'Informe a altura entre 120 e 230 cm.', type: 'faixa_invalida', field: 'altura' };
-    if (!(inp.w >= 30 && inp.w <= 300)) return { msg: 'Informe o peso entre 30 e 300 kg.', type: 'faixa_invalida', field: 'peso' };
-    if (!(inp.bmi >= 12 && inp.bmi <= 70)) return { msg: 'Altura e peso resultam em um IMC fora do intervalo esperado. Confira os valores.', type: 'imc_invalido', field: 'peso' };
+    if (!(inp.h >= 120 && inp.h <= 230)) return { msg: 'Informe a altura entre 120 e 230 cm.', type: 'faixa_invalida' };
+    if (!(inp.w >= 30 && inp.w <= 300)) return { msg: 'Informe o peso entre 30 e 300 kg.', type: 'faixa_invalida' };
+    if (!(inp.bmi >= 12 && inp.bmi <= 70)) return { msg: 'Altura e peso resultam em um IMC fora do intervalo esperado. Confira os valores.', type: 'imc_invalido' };
     if (inp.smoke === 'former' && inp.quitAge > inp.age) return { msg: 'A idade em que parou de fumar não pode ser maior que a idade atual.', silent: true };
     return null;
   }
@@ -484,7 +484,7 @@ function compute(inp) {
     var inp = read(), err = validate(inp), warn = $('warn');
     if (err) {
       warn.textContent = err.msg; warn.hidden = false;
-      if (!err.silent) track('calc_error', { error_type: err.type, field: err.field });
+      if (!err.silent) track('calc_error', { error_type: err.type });
       return;
     }
     warn.hidden = true;
@@ -501,20 +501,15 @@ function compute(inp) {
     started = true;
     track('calc_start');
   });
-  // Campos de hábitos. Fora de propósito: "idade em que parou" (só aparece para ex-fumantes)
+  // Progresso do formulário: só QUANTOS campos foram preenchidos (1 a 5), nunca quais nem as respostas.
+  // Fora de propósito: "idade em que parou" (só aparece para ex-fumantes)
+  var touched = {}, progress = 0;
   ['altura', 'peso', 'fumo', 'alcool', 'atividade'].forEach(function (f) {
-    var el = $('f-' + f);
-    var focused = false, completed = false, changes = 0;
-    el.addEventListener('focus', function () {
-      if (focused) return;
-      focused = true;
-      track('field_focus', { field: f });
-    });
-    el.addEventListener('change', function (ev) {
-      if (!human(ev)) return;
-      changes++;
-      if (!completed) { completed = true; track('field_complete', { field: f }); }
-      else { track('field_change', { field: f, change_count: Math.min(changes, 3) }); }
+    $('f-' + f).addEventListener('change', function (ev) {
+      if (!human(ev) || touched[f]) return;
+      touched[f] = true;
+      progress++;
+      track('form_progress', { fields_completed: progress });
     });
   });
   Array.prototype.forEach.call(document.querySelectorAll('input[name=sex]'), function (r) {
